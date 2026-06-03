@@ -1,0 +1,150 @@
+{
+  "entities": {
+    "Series": {
+      "title": "Series",
+      "description": "Details about translated or dubbed TV series shown in the app",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "subTitle": { "type": "string" },
+        "country": { "type": "string" },
+        "genre": { "type": "string" },
+        "year": { "type": "integer" },
+        "status": { "type": "string" },
+        "badge": { "type": "string" },
+        "age": { "type": "string" },
+        "poster": { "type": "string" },
+        "story": { "type": "string" },
+        "col": { "type": "string" },
+        "views": { "type": "integer" },
+        "actors": { "type": "array" },
+        "episodes": { "type": "array" }
+      },
+      "required": ["id", "title"]
+    },
+    "Channel": {
+      "title": "Channel",
+      "description": "A live TV streaming channel config",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "cat": { "type": "string" },
+        "country": { "type": "string" },
+        "logo": { "type": "string" },
+        "streamUrl": { "type": "string" },
+        "active": { "type": "boolean" }
+      },
+      "required": ["id", "name"]
+    },
+    "Match": {
+      "title": "Match",
+      "description": "A football or sports match to display in the sports section",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "league": { "type": "string" },
+        "home": { "type": "string" },
+        "away": { "type": "string" },
+        "score": { "type": "string" },
+        "time": { "type": "string" },
+        "day": { "type": "string" },
+        "status": { "type": "string" },
+        "isLive": { "type": "boolean" },
+        "hFlag": { "type": "string" },
+        "aFlag": { "type": "string" },
+        "links": { "type": "array" }
+      },
+      "required": ["id", "league", "home", "away"]
+    },
+    "Banner": {
+      "title": "Banner",
+      "description": "Information banners and interactive ads shown on the home page",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string" },
+        "title": { "type": "string" },
+        "subtitle": { "type": "string" },
+        "url": { "type": "string" },
+        "active": { "type": "boolean" },
+        "icon": { "type": "string" },
+        "bgColor": { "type": "string" }
+      },
+      "required": ["id", "title"]
+    },
+    "Settings": {
+      "title": "Settings",
+      "description": "Global application properties like telegram url, app identity or maintenance mode",
+      "type": "object",
+      "properties": {
+        "telegram": { "type": "string" },
+        "whatsapp": { "type": "string" },
+        "email": { "type": "string" },
+        "appName": { "type": "string" },
+        "tagline": { "type": "string" },
+        "bannerText": { "type": "string" },
+        "primaryColor": { "type": "string" },
+        "showTelegramBanner": { "type": "boolean" },
+        "showAnimeBanner": { "type": "boolean" },
+        "maintenance": { "type": "boolean" }
+      }
+    },
+    "AdminUser": {
+      "title": "AdminUser",
+      "description": "An administrative supervisor or superadmin with access to specific panels",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["superadmin", "moderator"] },
+        "sections": { "type": "array" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["uid", "name", "email", "role", "sections"]
+    },
+    "SystemAlert": {
+      "title": "SystemAlert",
+      "description": "Dashboard and client application alerts or popups",
+      "type": "object",
+      "properties": {
+        "isActive": { "type": "boolean" },
+        "title": { "type": "string" },
+        "message": { "type": "string" }
+      },
+      "required": ["isActive", "title", "message"]
+    }
+  },
+  "firestore": {
+    "system_alerts/{alertId}": {
+      "schema": "SystemAlert",
+      "description": "System-wide popup alert warnings and triggers"
+    },
+    "series/{seriesId}": {
+      "schema": "Series",
+      "description": "Collection of all translated/dubbed series"
+    },
+    "channels/{channelId}": {
+      "schema": "Channel",
+      "description": "List of streaming TV channels"
+    },
+    "matches/{matchId}": {
+      "schema": "Match",
+      "description": "List of match details for match day programs"
+    },
+    "banners/{bannerId}": {
+      "schema": "Banner",
+      "description": "Carousel banners or notifications"
+    },
+    "settings/appSettings": {
+      "schema": "Settings",
+      "description": "Singular document containing overall system preferences"
+    },
+    "admins/{adminId}": {
+      "schema": "AdminUser",
+      "description": "List of role-based administrator accounts configured by the super-owner"
+    }
+  }
+}

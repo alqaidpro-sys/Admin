@@ -1,0 +1,82 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner() {
+      return isSignedIn() && 
+             'email' in request.auth.token && 
+             request.auth.token.email.matches('(?i)^alqaidpro@gmail\\.com$');
+    }
+
+    function isAdminWithSection(section) {
+      return isSignedIn() && (
+        isOwner() || (
+          exists(/databases/$(database)/documents/admins/$(request.auth.uid)) && (
+            get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.role == "superadmin" ||
+            get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.sections.hasAny([section, "all", "series"])
+          )
+        )
+      );
+    }
+
+    // Default deny catch-all for safety
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Series Collection Rules: Public viewable, writable by Owner or authorized Admin
+    match /series/{seriesId} {
+      allow read: if true;
+      allow write: if isOwner() || isAdminWithSection("series");
+    }
+
+    // System Alerts Rules: Public viewable, writable by Owner or Admins
+    match /system_alerts/{alertId} {
+      allow read: if true;
+      allow write: if isOwner() || isAdminWithSection("settings");
+    }
+
+    // Channels Collection Rules: Public viewable, writable by Owner or authorized Admin
+    match /channels/{channelId} {
+      allow read: if true;
+      allow write: if isOwner() || isAdminWithSection("channels");
+    }
+
+    // Matches Collection Rules: Public viewable, writable by Owner or authorized Admin
+    match /matches/{matchId} {
+      allow read: if true;
+      allow write: if isOwner() || isAdminWithSection("matches");
+    }
+
+    // Banners Collection Rules: Public viewable, writable by Owner or authorized Admin
+    match /banners/{bannerId} {
+      allow read: if true;
+      allow write: if isOwner() || isAdminWithSection("banners");
+    }
+
+    // Settings Collection Rules: Public viewable, writable by Owner or authorized Admin
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isOwner() || isAdminWithSection("settings");
+    }
+
+    // Admins Collection Rules: Read-only for registered Admins or the Owner, writable by Owner
+    match /admins/{adminId} {
+      allow get: if isSignedIn() && (
+        isOwner() || 
+        adminId == request.auth.uid || 
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+      allow list: if isSignedIn() && (
+        isOwner() || 
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+      allow write: if isOwner();
+    }
+  }
+}

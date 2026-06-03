@@ -1,0 +1,6 @@
+{
+  "name": "MiM Plus Admin",
+  "description": "لوحة تحكم وتوجيه لتطبيق MiM Plus للبث المباشر والمسلسلات والرياضة بربط بفايربيز وإدارة الصلاحيات والمشرفين",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

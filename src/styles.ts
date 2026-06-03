@@ -1,0 +1,73 @@
+export const C = {
+  bg:        "#080F0D",
+  bg2:       "#0D1612",
+  card:      "#111C18",
+  card2:     "#0A1410",
+  border:    "#1F312B",
+  border2:   "#2A4038",
+  teal:      "#00A896",
+  tealDim:   "rgba(0,168,150,.12)",
+  tealGlow:  "rgba(0,168,150,.22)",
+  tealDeep:  "#08413A",
+  tealMid:   "#006D5B",
+  text:      "#F2F4F3",
+  textSec:   "#708D81",
+  textDim:   "#445C52",
+  gold:      "#D4A373",
+  goldDim:   "rgba(212,163,115,.12)",
+  red:       "#D94F4F",
+  redDim:    "rgba(217,79,79,.12)",
+  live:      "#4F772D",
+  liveDim:   "rgba(79,119,45,.12)",
+  font:      "'Cairo','Noto Kufi Arabic','Segoe UI',sans-serif",
+};
+
+export const btn = (variant = "primary") => ({
+  border: "none",
+  cursor: "pointer",
+  fontFamily: C.font,
+  fontWeight: 700,
+  borderRadius: 8,
+  padding: "8px 16px",
+  fontSize: 13,
+  transition: "all .15s",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 6,
+  ...(variant === "primary"   ? { background: `linear-gradient(135deg,${C.teal},${C.tealDeep})`, color: "#fff", boxShadow: `0 2px 10px ${C.tealGlow}` } : {}),
+  ...(variant === "danger"    ? { background: C.redDim, color: C.red, border: `1px solid ${C.red}44` } : {}),
+  ...(variant === "ghost"     ? { background: "none", color: C.textSec, border: `1px solid ${C.border}` } : {}),
+  ...(variant === "gold"      ? { background: C.goldDim, color: C.gold, border: `1px solid ${C.gold}44` } : {}),
+  ...(variant === "sm"        ? { background: C.tealDim, color: C.teal, border: `1px solid ${C.teal}44`, padding: "5px 10px", fontSize: 12 } : {}),
+  ...(variant === "danger-sm" ? { background: C.redDim, color: C.red, border: `1px solid ${C.red}33`, padding: "5px 10px", fontSize: 12 } : {}),
+  ...(variant === "warning"   ? { background: "rgba(212,163,115,.12)", color: C.gold, border: `1px solid ${C.gold}44`, padding: "5px 10px", fontSize: 12 } : {}),
+});
+
+export const inp = (multiline = false) => ({
+  background: C.card2,
+  border: `1px solid ${C.border}`,
+  borderRadius: 8,
+  color: C.text,
+  fontFamily: C.font,
+  fontSize: 13,
+  padding: "9px 12px",
+  outline: "none",
+  width: "100%",
+  boxSizing: "border-box" as const,
+  resize: multiline ? "vertical" as const : "none" as const,
+  ...(multiline ? { minHeight: 80 } : { height: 36 }),
+});
+
+export const sel = () => ({
+  ...inp(),
+  height: 36,
+  cursor: "pointer",
+  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23708D81' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`,
+  backgroundRepeat: "no-repeat",
+  backgroundPosition: "left 10px center",
+  paddingLeft: 28,
+  appearance: "none" as const,
+});
+
+export const uid = () => Math.random().toString(36).slice(2, 9);
