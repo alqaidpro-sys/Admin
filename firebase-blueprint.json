@@ -115,9 +115,30 @@
         "message": { "type": "string" }
       },
       "required": ["isActive", "title", "message"]
+    },
+    "ActivityLog": {
+      "title": "ActivityLog",
+      "description": "Administrator activity log recording creation, update, and deletion events",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "adminId": { "type": "string" },
+        "adminName": { "type": "string" },
+        "adminEmail": { "type": "string" },
+        "action": { "type": "string", "enum": ["create", "update", "delete"] },
+        "section": { "type": "string" },
+        "itemId": { "type": "string" },
+        "itemTitle": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["id", "adminId", "adminName", "adminEmail", "action", "section", "itemId", "itemTitle", "timestamp"]
     }
   },
   "firestore": {
+    "activity_logs/{logId}": {
+      "schema": "ActivityLog",
+      "description": "Log of administrative operations executed on the Firestore database"
+    },
     "system_alerts/{alertId}": {
       "schema": "SystemAlert",
       "description": "System-wide popup alert warnings and triggers"

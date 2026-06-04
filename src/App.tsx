@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { onAuthStateChanged, signOut, User } from "firebase/auth";
-import { doc, getDoc, onSnapshot, collection, setDoc, deleteDoc } from "firebase/firestore";
+import { doc, getDoc, onSnapshot, collection, setDoc, deleteDoc, getDocs } from "firebase/firestore";
 import { initializeApp, deleteApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import { auth, db } from "./firebase";
@@ -12,7 +12,8 @@ import {
   Match,
   Banner,
   AppSettings,
-  AdminUser
+  AdminUser,
+  ActivityLog
 } from "./types";
 
 // Component imports
@@ -24,6 +25,8 @@ import MatchesPage from "./components/MatchesPage";
 import BannersPage from "./components/BannersPage";
 import SettingsPage from "./components/SettingsPage";
 import Supervisors from "./components/Supervisors";
+import ActivityLogPage from "./components/ActivityLogPage";
+import { logActivity } from "./utils/activityLogger";
 import { Toast } from "./components/CommonUI";
 import { 
   DEFAULT_SERIES, 
@@ -34,7 +37,7 @@ import {
   DEFAULT_SETTINGS as DEFAULT_SETTINGS_MOCK
 } from "./utils/mockData";
 
-type SectionType = "dashboard" | "series" | "channels" | "matches" | "banners" | "settings" | "supervisors";
+type SectionType = "dashboard" | "series" | "channels" | "matches" | "banners" | "settings" | "supervisors" | "activity_logs";
 
 // Default configuration constants to initialize empty databases securely
 const DEFAULT_SETTINGS: AppSettings = {
@@ -55,9 +58,6 @@ const DEFAULT_SETTINGS: AppSettings = {
 };
 
 export default function App() {
-  // Local Demo Mode tracking state
-  const [isLocalMode, setIsLocalMode] = useState(() => localStorage.getItem("use_local_db") === "true");
-
   const [user, setUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<AdminUser | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -71,59 +71,12 @@ export default function App() {
   const [banners, setBanners] = useState<Banner[]>([]);
   const [admins, setAdmins] = useState<AdminUser[]>([]);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
 
   // Navigation & Toasts
   const [page, setPage] = useState<SectionType>("dashboard");
   const [toast, setToast] = useState<{ msg: string; type?: "success" | "warning" | "danger" } | null>(null);
   const [navItems, setNavItems] = useState<{ k: SectionType; icon: string; label: string }[]>([]);
-
-  // Local Mode state loader effect
-  useEffect(() => {
-    if (isLocalMode) {
-      const loadOrSeed = (key: string, defaultVal: any) => {
-        const saved = localStorage.getItem(key);
-        if (saved) {
-          try {
-            return JSON.parse(saved);
-          } catch (e) {
-            return defaultVal;
-          }
-        }
-        localStorage.setItem(key, JSON.stringify(defaultVal));
-        return defaultVal;
-      };
-
-      setSeries(loadOrSeed("local_series", DEFAULT_SERIES));
-      setChannels(loadOrSeed("local_channels", DEFAULT_CHANNELS));
-      setMatches(loadOrSeed("local_matches", DEFAULT_MATCHES));
-      setBanners(loadOrSeed("local_banners", DEFAULT_BANNERS));
-      setSettings(loadOrSeed("local_settings", DEFAULT_SETTINGS_MOCK));
-      setAdmins(loadOrSeed("local_admins", DEFAULT_ADMINS));
-
-      setUser({ uid: "local-demo-uid", email: "alqaidpro@gmail.com" } as any);
-      const mockProfile: AdminUser = {
-        uid: "local-demo-uid",
-        email: "alqaidpro@gmail.com",
-        name: "المدير العام (طور التجربة)",
-        role: "superadmin",
-        sections: ["all"],
-        createdAt: new Date().toISOString().slice(0, 10)
-      };
-      setUserProfile(mockProfile);
-      setIsAdmin(true);
-
-      setNavItems([
-        { k: "dashboard", icon: "📊", label: "لوحة التحكم" },
-        { k: "series",    icon: "🎬", label: "المسلسلات"   },
-        { k: "channels",  icon: "📺", label: "القنوات وTV" },
-        { k: "matches",   icon: "⚽", label: "المباريات"   },
-        { k: "banners",   icon: "🎯", label: "البانرات"    },
-        { k: "settings",  icon: "⚙",  label: "الإعدادات"  },
-        { k: "supervisors", icon: "👥", label: "المشرفين" }
-      ]);
-      setLoading(false);
-    }
-  }, [isLocalMode]);
 
   const showToast = (msg: string, type: "success" | "warning" | "danger" = "success") => {
     setToast({ msg, type });
@@ -131,7 +84,6 @@ export default function App() {
 
   // Auth State Listener
   useEffect(() => {
-    if (isLocalMode) return;
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setLoading(true);
       setLoadError(null);
@@ -184,6 +136,7 @@ export default function App() {
                 allowed.push({ k: "settings", icon: "⚙", label: "الإعدادات" });
               }
             }
+            allowed.push({ k: "activity_logs", icon: "📜", label: "سجل النشاطات" });
             
             setNavItems(allowed);
             setLoading(false);
@@ -210,7 +163,8 @@ export default function App() {
                 { k: "matches",   icon: "⚽", label: "المباريات"   },
                 { k: "banners",   icon: "🎯", label: "البانرات"    },
                 { k: "settings",  icon: "⚙",  label: "الإعدادات"  },
-                { k: "supervisors", icon: "👥", label: "المشرفين" }
+                { k: "supervisors", icon: "👥", label: "المشرفين" },
+                { k: "activity_logs", icon: "📜", label: "سجل النشاطات" }
               ]);
               setLoading(false);
             } else {
@@ -242,37 +196,61 @@ export default function App() {
 
   // Real-time Database Snapshot Sync
   useEffect(() => {
-    if (!user || isLocalMode) return;
+    if (!user) return;
 
     const unsubSeries = onSnapshot(collection(db, "series"), (snap) => {
       const list: Series[] = [];
-      snap.forEach(d => list.push(d.data() as Series));
+      snap.forEach(d => {
+        const data = d.data() as Series;
+        list.push({ ...data, id: d.id || data.id });
+      });
       setSeries(list);
     }, (err) => console.error("Series stream error:", err));
 
     const unsubChannels = onSnapshot(collection(db, "channels"), (snap) => {
       const list: Channel[] = [];
-      snap.forEach(d => list.push(d.data() as Channel));
+      snap.forEach(d => {
+        const data = d.data() as Channel;
+        list.push({ ...data, id: d.id || data.id });
+      });
       setChannels(list);
     }, (err) => console.error("Channels stream error:", err));
 
     const unsubMatches = onSnapshot(collection(db, "matches"), (snap) => {
       const list: Match[] = [];
-      snap.forEach(d => list.push(d.data() as Match));
+      snap.forEach(d => {
+        const data = d.data() as Match;
+        list.push({ ...data, id: d.id || data.id });
+      });
       setMatches(list);
     }, (err) => console.error("Matches stream error:", err));
 
     const unsubBanners = onSnapshot(collection(db, "banners"), (snap) => {
       const list: Banner[] = [];
-      snap.forEach(d => list.push(d.data() as Banner));
+      snap.forEach(d => {
+        const data = d.data() as Banner;
+        list.push({ ...data, id: d.id || data.id });
+      });
       setBanners(list);
     }, (err) => console.error("Banners stream error:", err));
 
     const unsubAdmins = onSnapshot(collection(db, "admins"), (snap) => {
       const list: AdminUser[] = [];
-      snap.forEach(d => list.push(d.data() as AdminUser));
+      snap.forEach(d => {
+        const data = d.data() as AdminUser;
+        list.push({ ...data, uid: d.id || data.uid });
+      });
       setAdmins(list);
     }, (err) => console.error("Admins stream error:", err));
+
+    const unsubActivityLogs = onSnapshot(collection(db, "activity_logs"), (snap) => {
+      const list: ActivityLog[] = [];
+      snap.forEach(d => {
+        const data = d.data() as ActivityLog;
+        list.push({ ...data, id: d.id || data.id });
+      });
+      setActivityLogs(list);
+    }, (err) => console.error("Activity logs stream error:", err));
 
     const unsubSettings = onSnapshot(doc(db, "settings", "appSettings"), async (docSnap) => {
       if (docSnap.exists()) {
@@ -296,188 +274,208 @@ export default function App() {
       unsubBanners();
       unsubAdmins();
       unsubSettings();
+      unsubActivityLogs();
     };
   }, [user]);
 
   const handleLogout = async () => {
     setLoading(true);
-    if (isLocalMode) {
-      setUser(null);
-      setUserProfile(null);
-      setIsAdmin(false);
-      setLoading(false);
-      return;
-    }
     await signOut(auth);
     setLoading(false);
   };
 
   // Helper integration functions
-  const handleSaveSeries = async (item: Series) => {
-    if (isLocalMode) {
-      const updated = series.some(s => s.id === item.id)
-        ? series.map(s => s.id === item.id ? item : s)
-        : [...series, item];
-      setSeries(updated);
-      localStorage.setItem("local_series", JSON.stringify(updated));
-      showToast("تم تحديث وحفظ العمل الفني محلياً بنجاح!");
-      return;
-    }
+  const handleClearLogs = async () => {
     try {
+      const qSnap = await getDocs(collection(db, "activity_logs"));
+      const promises = qSnap.docs.map(docRef => deleteDoc(docRef.ref));
+      await Promise.all(promises);
+      showToast("تم مسح كافة سجلات النشاط بنجاح!");
+      if (userProfile) {
+        await logActivity(
+          userProfile,
+          "delete",
+          "settings",
+          "all_logs",
+          "مسح سجلات النشاط بالكامل"
+        );
+      }
+    } catch (err: any) {
+      showToast("فشل مسح السجلات: " + err.message, "danger");
+    }
+  };
+
+  const handleSaveSeries = async (item: Series) => {
+    try {
+      const isNew = !series.some(s => s.id === item.id);
       await setDoc(doc(db, "series", item.id), item);
       showToast("تم تحديث وحفظ العمل الفني بنجاح!");
+      if (userProfile) {
+        await logActivity(
+          userProfile,
+          isNew ? "create" : "update",
+          "series",
+          item.id,
+          item.title
+        );
+      }
     } catch (err: any) {
       showToast("فشل الحفظ: " + err.message, "danger");
     }
   };
 
   const handleDeleteSeries = async (id: string) => {
-    if (isLocalMode) {
-      const updated = series.filter(s => s.id !== id);
-      setSeries(updated);
-      localStorage.setItem("local_series", JSON.stringify(updated));
-      showToast("تم حذف العمل محلياً!");
-      return;
-    }
     try {
+      const target = series.find(s => s.id === id);
       await deleteDoc(doc(db, "series", id));
       showToast("تم حذف العمل بنجاح!");
+      if (userProfile && target) {
+        await logActivity(
+          userProfile,
+          "delete",
+          "series",
+          id,
+          target.title
+        );
+      }
     } catch (err: any) {
       showToast("فشل الحذف: " + err.message, "danger");
     }
   };
 
   const handleSaveChannel = async (item: Channel) => {
-    if (isLocalMode) {
-      const updated = channels.some(c => c.id === item.id)
-        ? channels.map(c => c.id === item.id ? item : c)
-        : [...channels, item];
-      setChannels(updated);
-      localStorage.setItem("local_channels", JSON.stringify(updated));
-      showToast("تم تحديث وحفظ بيانات القناة محلياً بنجاح!");
-      return;
-    }
     try {
+      const isNew = !channels.some(c => c.id === item.id);
       await setDoc(doc(db, "channels", item.id), item);
       showToast("تم تحديث وحفظ بيانات القناة بنجاح!");
+      if (userProfile) {
+        await logActivity(
+          userProfile,
+          isNew ? "create" : "update",
+          "channels",
+          item.id,
+          item.name
+        );
+      }
     } catch (err: any) {
       showToast("فشل الحفظ: " + err.message, "danger");
     }
   };
 
   const handleDeleteChannel = async (id: string) => {
-    if (isLocalMode) {
-      const updated = channels.filter(c => c.id !== id);
-      setChannels(updated);
-      localStorage.setItem("local_channels", JSON.stringify(updated));
-      showToast("تم حذف القناة محلياً!");
-      return;
-    }
     try {
+      const target = channels.find(c => c.id === id);
       await deleteDoc(doc(db, "channels", id));
       showToast("تم حذف القناة بنجاح!");
+      if (userProfile && target) {
+        await logActivity(
+          userProfile,
+          "delete",
+          "channels",
+          id,
+          target.name
+        );
+      }
     } catch (err: any) {
       showToast("فشل الحذف: " + err.message, "danger");
     }
   };
 
   const handleSaveMatch = async (item: Match) => {
-    if (isLocalMode) {
-      const updated = matches.some(m => m.id === item.id)
-        ? matches.map(m => m.id === item.id ? item : m)
-        : [...matches, item];
-      setMatches(updated);
-      localStorage.setItem("local_matches", JSON.stringify(updated));
-      showToast("تم تحديث تفاصيل المباراة محلياً وحفظ النتيجة!");
-      return;
-    }
     try {
+      const isNew = !matches.some(m => m.id === item.id);
       await setDoc(doc(db, "matches", item.id), item);
       showToast("تم تحديث تفاصيل المباراة وحفظ النتيجة!");
+      if (userProfile) {
+        await logActivity(
+          userProfile,
+          isNew ? "create" : "update",
+          "matches",
+          item.id,
+          `${item.home} vs ${item.away}`
+        );
+      }
     } catch (err: any) {
       showToast("فشل الحفظ: " + err.message, "danger");
     }
   };
 
   const handleDeleteMatch = async (id: string) => {
-    if (isLocalMode) {
-      const updated = matches.filter(m => m.id !== id);
-      setMatches(updated);
-      localStorage.setItem("local_matches", JSON.stringify(updated));
-      showToast("تم حذف بطاقة المباراة محلياً!");
-      return;
-    }
     try {
+      const target = matches.find(m => m.id === id);
       await deleteDoc(doc(db, "matches", id));
       showToast("تم حذف بطاقة المباراة!");
+      if (userProfile && target) {
+        await logActivity(
+          userProfile,
+          "delete",
+          "matches",
+          id,
+          `${target.home} vs ${target.away}`
+        );
+      }
     } catch (err: any) {
       showToast("فشل الحذف: " + err.message, "danger");
     }
   };
 
   const handleSaveBanner = async (item: Banner) => {
-    if (isLocalMode) {
-      const updated = banners.some(b => b.id === item.id)
-        ? banners.map(b => b.id === item.id ? item : b)
-        : [...banners, item];
-      setBanners(updated);
-      localStorage.setItem("local_banners", JSON.stringify(updated));
-      showToast("تم حفظ وتحديث البانر الإعلاني محلياً!");
-      return;
-    }
     try {
+      const isNew = !banners.some(b => b.id === item.id);
       await setDoc(doc(db, "banners", item.id), item);
       showToast("تم حفظ وتحديث البانر الإعلاني!");
+      if (userProfile) {
+        await logActivity(
+          userProfile,
+          isNew ? "create" : "update",
+          "banners",
+          item.id,
+          item.title
+        );
+      }
     } catch (err: any) {
       showToast("فشل الحفظ: " + err.message, "danger");
     }
   };
 
   const handleDeleteBanner = async (id: string) => {
-    if (isLocalMode) {
-      const updated = banners.filter(b => b.id !== id);
-      setBanners(updated);
-      localStorage.setItem("local_banners", JSON.stringify(updated));
-      showToast("تم حذف البانر محلياً!");
-      return;
-    }
     try {
+      const target = banners.find(b => b.id === id);
       await deleteDoc(doc(db, "banners", id));
       showToast("تم حذف البانر بنجاح!");
+      if (userProfile && target) {
+        await logActivity(
+          userProfile,
+          "delete",
+          "banners",
+          id,
+          target.title
+        );
+      }
     } catch (err: any) {
       showToast("فشل الحذف: " + err.message, "danger");
     }
   };
 
   const handleSaveSettings = async (item: AppSettings) => {
-    if (isLocalMode) {
-      setSettings(item);
-      localStorage.setItem("local_settings", JSON.stringify(item));
-      showToast("تم حفظ جميع إعدادات المنصة وهويتها محلياً!");
-      return;
-    }
     try {
       await setDoc(doc(db, "settings", "appSettings"), item);
       showToast("تم حفظ جميع إعدادات المنصة وهويتها!");
+      if (userProfile) {
+        await logActivity(
+          userProfile,
+          "update",
+          "settings",
+          "appSettings",
+          "إعدادات المنصة العامة"
+        );
+      }
     } catch (err: any) {
       showToast("فشل حفظ الإعدادات: " + err.message, "danger");
     }
   };
 
   const handleCreateAdmin = async (admin: Partial<AdminUser>, pass: string) => {
-    if (isLocalMode) {
-      const newUid = "local-uid-" + Math.random().toString(36).slice(2, 9);
-      const newAdmin: AdminUser = {
-        ...(admin as AdminUser),
-        uid: newUid,
-        createdAt: new Date().toISOString().slice(0, 10)
-      };
-      const updated = [...admins, newAdmin];
-      setAdmins(updated);
-      localStorage.setItem("local_admins", JSON.stringify(updated));
-      showToast("تم إنشاء وتفويض حساب المشرف محلياً بنجاح!");
-      return;
-    }
     const tempApp = initializeApp(firebaseConfig, "temp-auth-app-" + Math.random().toString(36).slice(2, 9));
     const tempAuth = getAuth(tempApp);
     try {
@@ -489,6 +487,15 @@ export default function App() {
       };
       await setDoc(doc(db, "admins", uid), finalAdminObj);
       showToast("تم إنشاء وتفويض حساب المشرف الجديد بنجاح!");
+      if (userProfile) {
+        await logActivity(
+          userProfile,
+          "create",
+          "supervisors",
+          uid,
+          `الحساب: ${admin.name} (${admin.email})`
+        );
+      }
     } catch (err: any) {
       throw err;
     } finally {
@@ -497,16 +504,19 @@ export default function App() {
   };
 
   const handleDeleteAdmin = async (targetId: string) => {
-    if (isLocalMode) {
-      const updated = admins.filter(a => a.uid !== targetId);
-      setAdmins(updated);
-      localStorage.setItem("local_admins", JSON.stringify(updated));
-      showToast("تم سحب الصلاحية وحذف حساب المشرف محلياً!");
-      return;
-    }
     try {
+      const target = admins.find(a => a.uid === targetId);
       await deleteDoc(doc(db, "admins", targetId));
       showToast("تم سحب الصلاحية وحذف حساب المشرف!");
+      if (userProfile && target) {
+        await logActivity(
+          userProfile,
+          "delete",
+          "supervisors",
+          targetId,
+          `الحساب: ${target.name} (${target.email})`
+        );
+      }
     } catch (err: any) {
       showToast("فشل حذف المشرف: " + err.message, "danger");
     }
@@ -566,22 +576,6 @@ export default function App() {
                   🔄 إعادة المحاولة
                 </button>
                 
-                <button
-                  onClick={() => {
-                    localStorage.setItem("use_local_db", "true");
-                    setIsLocalMode(true);
-                    setLoadError(null);
-                    setLoading(false);
-                    window.location.reload();
-                  }}
-                  style={{
-                    flex: 1, minWidth: 150, padding: "10px 16px", borderRadius: 8, background: "rgba(212,163,115,0.1)", color: C.gold,
-                    border: `1px solid ${C.gold}44`, cursor: "pointer", fontSize: 13, fontWeight: "bold", transition: "all .15s"
-                  }}
-                >
-                  ⚡ طور التجربة المحلي
-                </button>
-
                 <button
                   onClick={async () => {
                     await signOut(auth);
@@ -683,50 +677,6 @@ export default function App() {
 
       {/* ─── CONTENT ─── */}
       <main style={{ flex: 1, padding: "28px 30px", overflowY: "auto", maxHeight: "100vh" }}>
-        {isLocalMode && (
-          <div style={{
-            background: "rgba(212,163,115,.06)",
-            border: `1px solid ${C.gold}44`,
-            borderRadius: 10,
-            padding: "12px 18px",
-            marginBottom: 20,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            fontSize: 13,
-            color: C.gold,
-            direction: "rtl",
-            gap: 16,
-            flexWrap: "wrap"
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ fontSize: 18 }}>💡</span>
-              <span style={{ lineHeight: "1.5" }}>
-                <strong>أنت تعمل حالياً في "طور التجربة المحلي" (Local Storage).</strong> التعديلات المحفوظة هنا تُخزن بمتصفحك فقط ولا تؤثر على مشروع Firebase. عند تفعيل Firestore الخاص بك، يمكنك العودة في أي وقت.
-              </span>
-            </div>
-            <button
-              onClick={() => {
-                localStorage.removeItem("use_local_db");
-                window.location.reload();
-              }}
-              style={{
-                background: C.gold,
-                color: "#16161a",
-                border: "none",
-                borderRadius: 6,
-                padding: "6px 12px",
-                fontSize: 12,
-                fontWeight: "bold",
-                cursor: "pointer",
-                transition: "all 0.15s",
-                whiteSpace: "nowrap"
-              }}
-            >
-              🔄 العودة لوضع Firebase
-            </button>
-          </div>
-        )}
         {page === "dashboard"   && (
           <DashboardPage
             series={series}
@@ -781,6 +731,13 @@ export default function App() {
             user={userProfile}
             onCreate={handleCreateAdmin}
             onDelete={handleDeleteAdmin}
+          />
+        )}
+        {page === "activity_logs" && userProfile && (
+          <ActivityLogPage
+            logs={activityLogs}
+            user={userProfile}
+            onClearLogs={handleClearLogs}
           />
         )}
       </main>

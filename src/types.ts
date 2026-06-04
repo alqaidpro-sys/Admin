@@ -113,3 +113,15 @@ export interface AdminUser {
   sections: string[];
   createdAt: string;
 }
+
+export interface ActivityLog {
+  id: string;
+  adminId: string;
+  adminName: string;
+  adminEmail: string;
+  action: "create" | "update" | "delete";
+  section: string;
+  itemId: string;
+  itemTitle: string;
+  timestamp: string;
+}

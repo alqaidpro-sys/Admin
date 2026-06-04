@@ -113,17 +113,7 @@ export default function Login({ onSuccess }: LoginProps) {
     }
   };
 
-  // Helper to handle Demo Logins cleanly
-  const handleDemo = (type: "super" | "drama" | "sports") => {
-    const creds = {
-      super: { em: "alqaidpro@gmail.com", pw: "admin123" },
-      drama: { em: "drama@mim.com", pw: "admin123" },
-      sports: { em: "sports@mim.com", pw: "admin123" }
-    };
-    const c = creds[type];
-    setEmail(c.em);
-    setPassword(c.pw);
-  };
+
 
   const executeGoogleLogin = async () => {
     setLoading(true);
@@ -285,6 +275,57 @@ export default function Login({ onSuccess }: LoginProps) {
 
         <h2 style={{ textAlign: "center", fontSize: 17, marginBottom: 20, color: C.text }}>🔐 تسجيل الدخول للإدارة</h2>
 
+        {/* 🆘 مساعد تسجيل الدخول وفك إعاقات النوافذ */}
+        <div style={{
+          background: "rgba(0,168,150,0.06)",
+          border: `1px solid ${C.teal}33`,
+          borderRadius: 12,
+          padding: "16px",
+          marginBottom: 20,
+          textAlign: "right",
+          fontSize: 13,
+          direction: "rtl",
+          boxShadow: "0 4px 15px rgba(0,0,0,0.15)"
+        }}>
+          <p style={{ margin: "0 0 12px", lineHeight: "1.6", fontWeight: "bold", color: C.text }}>
+            🛑 هل تواجه صعوبة في تسجيل الدخول بـ Google؟
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {/* خيار الخروج من الإطار لحل حظر النوافذ المنبثقة من قوقل */}
+            <a
+              href={window.location.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+                background: "rgba(255, 255, 255, 0.05)",
+                color: C.text,
+                padding: "10px 14px",
+                borderRadius: 8,
+                fontWeight: "bold",
+                textDecoration: "none",
+                textAlign: "center",
+                fontSize: "12px",
+                border: `1px solid ${C.border}`,
+                transition: "all 0.15s"
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "rgba(255,255,255,0.1)";
+                e.currentTarget.style.borderColor = C.teal;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "rgba(255,255,255,0.05)";
+                e.currentTarget.style.borderColor = C.border;
+              }}
+            >
+              🌐 فتح اللوحة في نافذة كاملة جديدة (لحل مشكلة حظر جوجل)
+            </a>
+          </div>
+        </div>
+
         {errorMsg && (
           <div style={{
             background: C.redDim,
@@ -432,29 +473,6 @@ export default function Login({ onSuccess }: LoginProps) {
 
           <button
             type="button"
-            onClick={() => {
-              localStorage.setItem("use_local_db", "true");
-              window.location.reload();
-            }}
-            style={{
-              width: "100%",
-              padding: "11px",
-              fontSize: "13px",
-              background: "rgba(212,163,115,.08)",
-              color: C.gold,
-              border: `1px solid ${C.gold}33`,
-              borderRadius: "8px",
-              cursor: "pointer",
-              fontWeight: "bold",
-              marginTop: "12px",
-              transition: "all .15s"
-            }}
-          >
-            ⚡ دخول تجريبي فوري (بدون اتصال Firebase)
-          </button>
-
-          <button
-            type="button"
             onClick={handleSeedDatabase}
             disabled={seeding}
             style={{
@@ -479,40 +497,6 @@ export default function Login({ onSuccess }: LoginProps) {
           </button>
         </form>
 
-        <div className="divider" style={{ margin: "20px 0 16px" }}></div>
-        <p style={{ textAlign: "center", fontSize: 12, color: C.textDim, marginBottom: 10 }}>⚡ دخول تجريبي سريع</p>
-        <div className="lr">
-          <button
-            type="button"
-            className="ldb"
-            style={{ backgroundColor: "rgba(212,163,115,.08)", borderColor: "rgba(212,163,115,.25)", color: C.gold }}
-            onClick={() => handleDemo("super")}
-          >
-            👑
-            <br />
-            مدير عام
-          </button>
-          <button
-            type="button"
-            className="ldb"
-            style={{ backgroundColor: C.tealDim, borderColor: "rgba(0,168,150,.25)", color: C.teal }}
-            onClick={() => handleDemo("drama")}
-          >
-            🎭
-            <br />
-            مسلسلات
-          </button>
-          <button
-            type="button"
-            className="ldb"
-            style={{ backgroundColor: C.liveDim, borderColor: "rgba(79,119,45,.25)", color: C.live }}
-            onClick={() => handleDemo("sports")}
-          >
-            ⚽
-            <br />
-            رياضة
-          </button>
-        </div>
         <p style={{ textAlign: "center", fontSize: 10, color: C.textDim, marginTop: 14 }}>هذه اللوحة للإدارة الحصرية فقط</p>
       </div>
     </div>

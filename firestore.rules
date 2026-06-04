@@ -78,5 +78,13 @@ service cloud.firestore {
       );
       allow write: if isOwner();
     }
+
+    // Activity Logs Collection Rules: Readable and writable by Owners or authenticated Admins
+    match /activity_logs/{logId} {
+      allow read, write: if isSignedIn() && (
+        isOwner() || 
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
   }
 }
